@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>离职申请表 - PDF生成器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600;700&display=swap');
+        
+        body {
+            font-family: 'Noto Serif SC', 'SimSun', '宋体', serif;
+            background: #f3f4f6;
+        }
+        
+        .form-input {
+            transition: all 0.2s;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .preview-page {
+            width: 210mm;
+            min-height: 297mm;
+            background: white;
+            margin: 0 auto;
+            padding: 20mm 15mm 15mm 15mm;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            position: relative;
+            font-family: 'Noto Serif SC', 'SimSun', '宋体', serif;
+            font-size: 10.5pt;
+            line-height: 1.6;
+            color: #000;
+        }
+        
+        .preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        
+        .preview-table td, .preview-table th {
+            border: 1px solid #000;
+            padding: 8px 10px;
+            vertical-align: middle;
+        }
+        
+        .preview-table .label-cell {
+            width: 15%;
+            text-align: center;
+            font-weight: normal;
+            background: #fff;
+        }
+        
+        .preview-table .value-cell {
+            width: 18%;
+            text-align: center;
+        }
+        
+        .statement-text {
+            text-indent: 2em;
+            text-align: justify;
+            line-height: 2.2;
+            padding: 15px;
+        }
+        
+        .signature-line {
+            border-bottom: 1px solid #000;
+            display: inline-block;
+            min-width: 120px;
+            text-align: center;
+            padding: 0 10px;
+            position: relative;
+            height: 36px;
+            vertical-align: bottom;
+        }
+        
+        .handwriting-text {
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 26pt;
+            color: #000;
+            display: inline-block;
+            transform: rotate(-2deg);
+            line-height: 1;
+        }
+        
+        .handwriting-img {
+            max-height: 40px;
+            max-width: 140px;
+            display: inline-block;
+            transform: rotate(-2deg);
+        }
+        
+        @media print {
+            body * { visibility: hidden; }
+            #preview-area, #preview-area * { visibility: visible; }
+            #preview-area {
+                position: absolute;
+                left: 0; top: 0;
+                margin: 0;
+                box-shadow: none;
+            }
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .input-group {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .signature-pad {
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            cursor: crosshair;
+            background: #fafafa;
+            touch-action: none;
+        }
+        .signature-pad:hover {
+            border-color: #94a3b8;
+        }
+        
+        /* 二维码模态框 */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 420px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* 手机端适配 */
+        @media (max-width: 768px) {
+            .preview-page {
+                width: 100%;
+                padding: 10mm 8mm;
+                font-size: 9pt;
+            }
+            .handwriting-text {
+                font-size: 20pt;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- 头部 -->
+    <div class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">PDF</div>
+                <h1 class="text-xl font-bold text-gray-800">离职申请表生成器</h1>
+            </div>
+            <div class="flex gap-3" id="desktop-actions">
+                <button onclick="showQRModal()" class="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
+                    📱 扫码填写
+                </button>
+                <button onclick="window.print()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                    🖨️ 浏览器打印
+                </button>
+                <button onclick="generatePDF()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30">
+                    📄 生成 PDF 下载
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 二维码模态框 -->
+    <div id="qr-modal" class="modal-overlay" onclick="if(event.target===this)hideQRModal()">
+        <div class="modal-content">
+            <h3 class="text-lg font-bold text-gray-800 mb-2">手机扫码填写</h3>
+            <p class="text-sm text-gray-500 mb-4">使用手机扫描下方二维码，即可在手机上直接填写并生成 PDF</p>
+            
+            <div id="qrcode-container" class="flex justify-center mb-4"></div>
+            
+            <div id="local-ip-box" class="hidden">
+                <p class="text-xs text-gray-400 mb-1">或同一 WiFi 下直接访问：</p>
+                <div id="local-ip-list" class="space-y-1 mb-4"></div>
+            </div>
+            
+            <div id="file-protocol-warning" class="hidden bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 text-left">
+                <p class="text-sm text-yellow-800 font-medium">⚠️ 当前为本地文件打开</p>
+                <p class="text-xs text-yellow-700 mt-1">二维码无法直接访问本地文件。请通过以下方式之一解决：</p>
+                <ul class="text-xs text-yellow-700 mt-1 list-disc list-inside space-y-0.5">
+                    <li>将本文件上传到服务器或 GitHub Pages</li>
+                    <li>电脑开启局域网共享（见下方提示）</li>
+                    <li>直接把文件传给手机打开填写</li>
+                </ul>
+            </div>
+            
+            <button onclick="hideQRModal()" class="w-full py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors">
+                关闭
+            </button>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8" id="main-layout">
+            
+            <!-- 左侧：表单输入区 -->
+            <div class="space-y-6" id="form-section">
+                <div class="input-group">
+                    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
+                        基本信息
+                    </h2>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">姓名 <span class="text-red-500">*</span></label>
+                            <input type="text" id="input-name" class="form-input w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="请输入姓名">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">出生年月 <span class="text-red-500">*</span></label>
+                            <input type="date" id="input-birth" class="form-input w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">岗位 <span class="text-red-500">*</span></label>
+                            <input type="text" id="input-position" class="form-input w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="例如：BD">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">最后工作日 <span class="text-red-500">*</span></label>
+                            <input type="date" id="input-lastday" class="form-input w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="w-1 h-6 bg-purple-500 rounded-full"></span>
+                        联系方式
+                    </h2>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">个人邮箱</label>
+                            <input type="text" id="input-email" class="form-input w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="选填">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">个人联系电话 <span class="text-red-500">*</span></label>
+                            <input type="text" id="input-phone" class="form-input w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="请输入手机号">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="w-1 h-6 bg-green-500 rounded-full"></span>
+                        身份信息
+                    </h2>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">身份证号码 <span class="text-red-500">*</span></label>
+                        <input type="text" id="input-idcard" class="form-input w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="请输入18位身份证号码">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="w-1 h-6 bg-red-500 rounded-full"></span>
+                        签署信息
+                    </h2>
+                    
+                    <div class="mb-4">
+                        <div class="flex gap-2 mb-3">
+                            <button onclick="setSignMode('text')" id="btn-text-mode" class="px-3 py-1.5 text-sm rounded-md bg-blue-100 text-blue-700 font-medium transition-colors">
+                                ✏️ 手写体文字
+                            </button>
+                            <button onclick="setSignMode('draw')" id="btn-draw-mode" class="px-3 py-1.5 text-sm rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                                ✍️ 手写签名板
+                            </button>
+                        </div>
+                        
+                        <div id="text-sign-panel">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">员工签名 <span class="text-red-500">*</span></label>
+                            <input type="text" id="input-signature" class="form-input w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="请输入签名，将显示为手写体">
+                        </div>
+                        
+                        <div id="draw-sign-panel" class="hidden">
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="block text-sm font-medium text-gray-700">在下方区域手写签名</label>
+                                <div class="flex gap-2">
+                                    <button onclick="clearSignature()" class="text-xs px-2 py-1 text-red-600 bg-red-50 rounded hover:bg-red-100">清空</button>
+                                    <button onclick="confirmSignature()" class="text-xs px-2 py-1 text-blue-600 bg-blue-50 rounded hover:bg-blue-100">确认签名</button>
+                                </div>
+                            </div>
+                            <canvas id="signature-canvas" class="signature-pad w-full" width="400" height="120"></canvas>
+                            <p class="text-xs text-gray-500 mt-1">支持鼠标和触摸屏手写，写完后点击"确认签名"</p>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">签署日期 <span class="text-red-500">*</span></label>
+                        <input type="date" id="input-sign-date" class="form-input w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                </div>
+
+                <button onclick="generatePDF()" class="btn-primary w-full py-3 rounded-xl text-white font-bold text-lg shadow-lg" id="btn-generate-pdf">
+                    📄 生成 PDF 文件
+                </button>
+                
+                <p class="text-xs text-gray-500 text-center">
+                    提示：也可以直接点击右上角"浏览器打印"，选择"另存为PDF"以获得最佳效果
+                </p>
+            </div>
+
+            <!-- 右侧：预览区域 -->
+            <div class="lg:sticky lg:top-24 lg:h-fit" id="preview-section">
+                <div class="bg-gray-200 p-4 rounded-xl">
+                    <div class="text-center text-sm text-gray-600 mb-2 font-medium">实时预览</div>
+                    <div id="preview-area" class="preview-page">
+                        <div style="font-size: 9pt; color: #333; margin-bottom: 8px;">RB2-L1-2025v1.0</div>
+                        
+                        <div style="text-align: center; font-size: 18pt; font-weight: bold; letter-spacing: 8px; margin-bottom: 20px; margin-top: 10px;">
+                            离职申请表
+                        </div>
+
+                        <table class="preview-table">
+                            <tr>
+                                <td class="label-cell">姓 名</td>
+                                <td class="value-cell" id="preview-name"></td>
+                                <td class="label-cell">出生年月</td>
+                                <td class="value-cell" id="preview-birth"></td>
+                                <td class="label-cell">岗 位</td>
+                                <td class="value-cell" id="preview-position"></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">个人邮箱</td>
+                                <td class="value-cell" id="preview-email" colspan="2"></td>
+                                <td class="label-cell">个人联系电话</td>
+                                <td class="value-cell" id="preview-phone" colspan="2"></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">身份证号码</td>
+                                <td class="value-cell" id="preview-idcard" colspan="2"></td>
+                                <td class="label-cell">最后工作日</td>
+                                <td class="value-cell" id="preview-lastday" colspan="2"></td>
+                            </tr>
+                        </table>
+
+                        <div style="border: 1px solid #000; border-top: none; padding: 0;">
+                            <div class="statement-text">
+                                本人因个人原因自愿解除与贵司签订的劳动合同。本人对与贵司劳动关系存续期间的其<br>
+                                他一切事项（包括但不限于工资、福利、津贴、补助、绩效、加班工资、年休假工资、病假<br>
+                                工资、报销款、工伤保险待遇、生育保险待遇、其他社保相关待遇）确认无任何争议。
+                            </div>
+                            <div style="padding: 0 15px 15px 15px; text-indent: 2em;">
+                                以上，均为本人真实意思表示，本人确认以上信息。
+                            </div>
+                            <div style="padding: 10px 15px 20px 15px; display: flex; align-items: center; gap: 60px;">
+                                <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                                    <span>员工（签名）：</span>
+                                    <span class="signature-line" id="preview-signature-box">
+                                        <span class="handwriting-text" id="preview-signature"></span>
+                                    </span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                                    <span>日期：</span>
+                                    <span id="preview-sign-date"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 25px; line-height: 2.2;">
+                            <div style="font-weight: bold; display: inline;">特别承诺：</div>
+                            <span>本人在离职后，仍需履行保密义务，不得向任何单位或个人透露获知的公司或客户的</span><br>
+                            <span>任何资料、信息等。公司已告知本人无需履行竞业限制义务，公司无需向本人支付竞业限制补偿</span><br>
+                            <span>金。</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 设备检测与布局切换 ====================
+        function isMobile() {
+            return window.innerWidth < 1024 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+        
+        function adjustLayout() {
+            if (isMobile()) {
+                // 手机端：隐藏预览区，全屏表单
+                document.getElementById('preview-section').style.display = 'none';
+                document.getElementById('desktop-actions').style.display = 'none';
+                document.getElementById('main-layout').classList.remove('grid-cols-1', 'lg:grid-cols-2');
+                document.getElementById('main-layout').classList.add('grid-cols-1');
+                
+                // 修改生成按钮文字
+                const btn = document.getElementById('btn-generate-pdf');
+                if (btn) btn.innerHTML = '📄 填写完成，生成 PDF';
+            }
+        }
+        
+        // ==================== 二维码功能 ====================
+        function showQRModal() {
+            const modal = document.getElementById('qr-modal');
+            const container = document.getElementById('qrcode-container');
+            const fileWarning = document.getElementById('file-protocol-warning');
+            const ipBox = document.getElementById('local-ip-box');
+            const ipList = document.getElementById('local-ip-list');
+            
+            container.innerHTML = '';
+            
+            const currentUrl = window.location.href;
+            
+            // 生成二维码
+            new QRCode(container, {
+                text: currentUrl,
+                width: 200,
+                height: 200,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.M
+            });
+            
+            // 检测协议
+            if (currentUrl.startsWith('file://')) {
+                fileWarning.classList.remove('hidden');
+                ipBox.classList.remove('hidden');
+                
+                // 获取局域网IP
+                getLocalIPs(function(ips) {
+                    ipList.innerHTML = '';
+                    if (ips.length === 0) {
+                        ipList.innerHTML = '<p class="text-xs text-gray-500">未能自动获取IP，请手动查看电脑网络设置</p>';
+                    } else {
+                        ips.forEach(ip => {
+                            const div = document.createElement('div');
+                            div.className = 'flex items-center justify-between bg-gray-50 rounded px-2 py-1';
+                            div.innerHTML = `
+                                <span class="text-xs font-mono text-gray-700">http://${ip}:8000/离职申请表.html</span>
+                                <button onclick="copyToClipboard('http://${ip}:8000/离职申请表.html')" class="text-xs text-blue-600 hover:text-blue-800">复制</button>
+                            `;
+                            ipList.appendChild(div);
+                        });
+                    }
+                });
+            } else {
+                fileWarning.classList.add('hidden');
+                ipBox.classList.add('hidden');
+            }
+            
+            modal.classList.add('active');
+        }
+        
+        function hideQRModal() {
+            document.getElementById('qr-modal').classList.remove('active');
+        }
+        
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('已复制到剪贴板：' + text);
+            });
+        }
+        
+        // 获取本机局域网IP（WebRTC方式）
+        function getLocalIPs(callback) {
+            const ips = [];
+            const RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
+            if (!RTCPeerConnection) {
+                callback([]);
+                return;
+            }
+            const pc = new RTCPeerConnection({iceServers:[]});
+            pc.createDataChannel('');
+            pc.onicecandidate = function(e) {
+                if (!e.candidate) {
+                    pc.close();
+                    callback(ips);
+                    return;
+                }
+                const ipMatch = /([0-9]{1,3}\.){3}[0-9]{1,3}/.exec(e.candidate.candidate);
+                if (ipMatch && ips.indexOf(ipMatch[0]) === -1 && !ipMatch[0].startsWith('0.') && ipMatch[0] !== '127.0.0.1') {
+                    ips.push(ipMatch[0]);
+                }
+            };
+            pc.createOffer().then(o => pc.setLocalDescription(o)).catch(() => callback([]));
+            setTimeout(() => {
+                if (ips.length === 0) callback([]);
+            }, 1000);
+        }
+        
+        // ==================== 签名板功能 ====================
+        const canvas = document.getElementById('signature-canvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let hasDrawn = false;
+        let signMode = 'text';
+
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: (clientX - rect.left) * (canvas.width / rect.width),
+                y: (clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        function startDraw(e) {
+            e.preventDefault();
+            isDrawing = true;
+            hasDrawn = true;
+            const pos = getPos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+        }
+
+        function draw(e) {
+            e.preventDefault();
+            if (!isDrawing) return;
+            const pos = getPos(e);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+        }
+
+        function endDraw() {
+            isDrawing = false;
+        }
+
+        canvas.addEventListener('mousedown', startDraw);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', endDraw);
+        canvas.addEventListener('mouseout', endDraw);
+        canvas.addEventListener('touchstart', startDraw, { passive: false });
+        canvas.addEventListener('touchmove', draw, { passive: false });
+        canvas.addEventListener('touchend', endDraw);
+
+        function clearSignature() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            hasDrawn = false;
+            document.getElementById('preview-signature').style.display = '';
+            const img = document.getElementById('preview-signature-img');
+            if (img) img.remove();
+        }
+
+        function confirmSignature() {
+            if (!hasDrawn) {
+                alert('请先手写签名');
+                return;
+            }
+            const dataURL = canvas.toDataURL('image/png');
+            const box = document.getElementById('preview-signature-box');
+            
+            const text = document.getElementById('preview-signature');
+            text.style.display = 'none';
+            
+            const oldImg = document.getElementById('preview-signature-img');
+            if (oldImg) oldImg.remove();
+            
+            const img = document.createElement('img');
+            img.id = 'preview-signature-img';
+            img.src = dataURL;
+            img.className = 'handwriting-img';
+            img.style.maxHeight = '36px';
+            box.appendChild(img);
+        }
+
+        function setSignMode(mode) {
+            signMode = mode;
+            const textPanel = document.getElementById('text-sign-panel');
+            const drawPanel = document.getElementById('draw-sign-panel');
+            const btnText = document.getElementById('btn-text-mode');
+            const btnDraw = document.getElementById('btn-draw-mode');
+            
+            if (mode === 'text') {
+                textPanel.classList.remove('hidden');
+                drawPanel.classList.add('hidden');
+                btnText.className = 'px-3 py-1.5 text-sm rounded-md bg-blue-100 text-blue-700 font-medium transition-colors';
+                btnDraw.className = 'px-3 py-1.5 text-sm rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors';
+                
+                document.getElementById('preview-signature').style.display = '';
+                const img = document.getElementById('preview-signature-img');
+                if (img) img.style.display = 'none';
+                updatePreview();
+            } else {
+                textPanel.classList.add('hidden');
+                drawPanel.classList.remove('hidden');
+                btnDraw.className = 'px-3 py-1.5 text-sm rounded-md bg-blue-100 text-blue-700 font-medium transition-colors';
+                btnText.className = 'px-3 py-1.5 text-sm rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors';
+            }
+        }
+
+        // ==================== 实时同步 ====================
+        const fields = [
+            { input: 'input-name', preview: 'preview-name' },
+            { input: 'input-birth', preview: 'preview-birth' },
+            { input: 'input-position', preview: 'preview-position' },
+            { input: 'input-email', preview: 'preview-email' },
+            { input: 'input-phone', preview: 'preview-phone' },
+            { input: 'input-idcard', preview: 'preview-idcard' },
+            { input: 'input-signature', preview: 'preview-signature' },
+        ];
+
+        function updatePreview() {
+            if (signMode !== 'text') return;
+            
+            fields.forEach(field => {
+                const input = document.getElementById(field.input);
+                const preview = document.getElementById(field.preview);
+                if (input && preview) {
+                    preview.textContent = input.value || '';
+                }
+            });
+
+            const lastday = document.getElementById('input-lastday').value;
+            if (lastday) {
+                const d = new Date(lastday);
+                const formatted = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+                document.getElementById('preview-lastday').textContent = formatted;
+            } else {
+                document.getElementById('preview-lastday').textContent = '';
+            }
+
+            const signDate = document.getElementById('input-sign-date').value;
+            if (signDate) {
+                const d = new Date(signDate);
+                const formatted = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+                document.getElementById('preview-sign-date').textContent = formatted;
+            } else {
+                document.getElementById('preview-sign-date').textContent = '';
+            }
+        }
+
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', updatePreview);
+            input.addEventListener('change', updatePreview);
+        });
+
+        // ==================== PDF 生成 ====================
+        async function generatePDF() {
+            const btn = document.querySelector('button[onclick="generatePDF()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ 生成中...';
+            btn.disabled = true;
+
+            try {
+                // 如果是手机端，先临时显示预览区以便截图
+                const previewSection = document.getElementById('preview-section');
+                const wasHidden = previewSection.style.display === 'none';
+                if (wasHidden) {
+                    previewSection.style.display = 'block';
+                    previewSection.style.position = 'fixed';
+                    previewSection.style.left = '-9999px';
+                }
+                
+                const { jsPDF } = window.jspdf;
+                const element = document.getElementById('preview-area');
+                
+                const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#ffffff',
+                    logging: false
+                });
+
+                if (wasHidden) {
+                    previewSection.style.display = 'none';
+                    previewSection.style.position = '';
+                    previewSection.style.left = '';
+                }
+
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+                const imgWidth = canvas.width;
+                const imgHeight = canvas.height;
+                const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+                
+                const imgX = (pdfWidth - imgWidth * ratio) / 2;
+                const imgY = 0;
+
+                pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+                
+                const name = document.getElementById('input-name').value || '离职申请表';
+                pdf.save(`${name}_离职申请表.pdf`);
+
+            } catch (error) {
+                console.error('PDF生成失败:', error);
+                alert('PDF生成失败，请尝试使用浏览器打印功能（Ctrl+P / Cmd+P），选择"另存为PDF"');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // 初始化
+        adjustLayout();
+        window.addEventListener('resize', adjustLayout);
+    </script>
+</body>
+</html>
